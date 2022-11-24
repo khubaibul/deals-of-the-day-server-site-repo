@@ -27,6 +27,8 @@ app.get("/", (req, res) => {
 async function dataBase() {
     try {
         const usersCollection = client.db("deals-of-the-day").collection("users");
+        const categoriesCollection = client.db("deals-of-the-day").collection("categories");
+        const productsCollection = client.db("deals-of-the-day").collection("products");
 
         // Save User Info
         app.put("/user/:email", async (req, res) => {
@@ -41,6 +43,48 @@ async function dataBase() {
             const result = await usersCollection.updateOne(filter, updatedDoc, options);
 
             res.send({ result })
+        })
+
+
+        // Send Product Category
+        app.get("/all-category", async (req, res) => {
+            const query = {};
+            const allCategory = await categoriesCollection.find(query).toArray();
+            res.send(allCategory);
+        })
+
+        // 
+
+        // Save Product Into DataBase
+        app.post("/add-product", async (req, res) => {
+            const product = req.body;
+            const result = await productsCollection.insertOne(product);
+            res.send(result)
+        })
+
+
+        // Send Category Wise Product
+        app.get("/category/:category_name", async (req, res) => {
+            const category = req.params.category_name;
+            const query = { category: category }
+            const categoryProduct = await productsCollection.find(query).toArray();
+            res.send(categoryProduct)
+        })
+
+
+
+
+
+
+
+
+        // Send Product By Their Category
+        app.get("/product/:category", async (req, res) => {
+            const category = req.params.category;
+            const query = { category: category }
+
+            const product = await productsCollection.find(query).toArray();
+            res.send(product);
         })
 
     }
