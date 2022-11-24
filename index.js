@@ -29,6 +29,7 @@ async function dataBase() {
         const usersCollection = client.db("deals-of-the-day").collection("users");
         const categoriesCollection = client.db("deals-of-the-day").collection("categories");
         const productsCollection = client.db("deals-of-the-day").collection("products");
+        const bookingsCollection = client.db("deals-of-the-day").collection("bookings");
 
         // Save User Info
         app.put("/user/:email", async (req, res) => {
@@ -71,6 +72,22 @@ async function dataBase() {
             res.send(categoryProduct)
         })
 
+
+        // Store Booking Product
+        app.post("/store-booking-product", async (req, res) => {
+            const bookingProductDetails = req.body;
+            const result = await bookingsCollection.insertOne(bookingProductDetails);
+            res.send(result);
+        })
+
+
+        // Send Booking Product By Their Specific Email
+        app.get("/myOrders", async (req, res) => {
+            const email = req.query.email;
+            const query = { buyerEmail: email }
+            const userOrders = await bookingsCollection.find(query).toArray();
+            res.send(userOrders);
+        })
 
 
 
