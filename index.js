@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 require("colors");
 require("dotenv").config();
+const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const app = express();
 const port = process.env.PORT || 5000;
@@ -30,6 +31,8 @@ async function dataBase() {
         const categoriesCollection = client.db("deals-of-the-day").collection("categories");
         const productsCollection = client.db("deals-of-the-day").collection("products");
         const bookingsCollection = client.db("deals-of-the-day").collection("bookings");
+        const wishlistCollection = client.db("deals-of-the-day").collection("wishlist");
+        const paymentsCollection = client.db("deals-of-the-day").collection("payments");
 
         // Save User Info
         app.put("/user/:email", async (req, res) => {
@@ -96,7 +99,8 @@ async function dataBase() {
             const category = req.params.category_name;
             const query = { category: category }
             const categoryProduct = await productsCollection.find(query).toArray();
-            res.send(categoryProduct)
+            const availableProduct = categoryProduct.filter(product => !product.paid)
+            res.send(availableProduct)
         })
 
 
@@ -115,6 +119,117 @@ async function dataBase() {
             const userOrders = await bookingsCollection.find(query).toArray();
             res.send(userOrders);
         })
+
+        // Send Specific Booking Product By ID
+        app.get("/booking-payment/:id", async (req, res) => {
+            const id = req.params.id;
+            const query = { _id: ObjectId(id) };
+            const bookingProduct = await bookingsCollection.findOne(query);
+            res.send(bookingProduct);
+        })
+
+
+        // Store Wishlist Product From Specific User
+        app.post("/add-to-wishlist", async (req, res) => {
+            const wishlistProduct = req.body;
+            const productId = wishlistProduct.productId;
+            const buyerEmail = wishlistProduct.buyerEmail;
+            const filter = { productId: productId, buyerEmail: buyerEmail }
+            const alreadyAdded = await wishlistCollection.find(filter).toArray();
+
+            if (alreadyAdded.length === 0) {
+                const result = await wishlistCollection.insertOne(wishlistProduct);
+                return res.send(result);
+            }
+            res.send({ message: "Already Added" })
+
+        })
+
+
+        // Send Wishlist Product By Their Email
+        app.get("/my-wishlist/:email", async (req, res) => {
+            const buyerEmail = req.params.email;
+            const query1 = { buyerEmail: buyerEmail }
+            const wishlistProducts = await wishlistCollection.find(query1).toArray();
+            const query2 = {};
+            const products = await productsCollection.find(query2).toArray();
+            const alreadySold = products.filter(product => product.paid);
+
+            const remainingProducts = wishlistProducts.filter(product =>
+                alreadySold.map(sold => sold._id !== product.productId)
+            )
+
+            console.log(remainingProducts);
+
+
+
+
+
+
+
+
+
+            res.send(remainingProducts)
+        })
+
+
+
+        // Stripe
+        app.post("/create-payment-intent", async (req, res) => {
+            const booking = req.body;
+            const price = booking.price;
+            const amount = price * 100;
+
+            const paymentIntent = await stripe.paymentIntents.create({
+                currency: "usd",
+                amount: amount,
+                "payment_method_types": [
+                    "card"
+                ]
+            });
+            res.send({
+                clientSecret: paymentIntent.client_secret,
+            });
+
+        });
+
+
+        // Store Successful Payment Information
+        app.post("/payment", async (req, res) => {
+            const payment = req.body;
+            const result = await paymentsCollection.insertOne(payment);
+
+            const id = payment.bookingId;
+            const query1 = { _id: ObjectId(id) };
+            const productId = payment.productId;
+            const query2 = { _id: ObjectId(productId) }
+            const updateDoc = {
+                $set: {
+                    paid: true,
+                    transactionId: payment.transactionId
+                }
+            }
+            const updatePaymentStatusInBookingCollection = await bookingsCollection.updateOne(query1, updateDoc);
+            const updatePaymentStatusInProductCollection = await productsCollection.updateOne(query2, updateDoc);
+            res.send(result);
+        })
+
+
+
+        // Load Specific User By Email
+        app.get("/user/admin/:email", async (req, res) => {
+            const email = req.params.email;
+            const query = { email: email };
+            const user = await usersCollection.findOne(query);
+            if (user.buyerOrSeller === "Admin") {
+                res.send({ isAdmin: "Admin" })
+            }
+            else {
+                res.send({ isAdmin: false })
+            }
+        })
+
+
 
 
 
