@@ -94,6 +94,14 @@ async function dataBase() {
 
         })
 
+        // Delete Specific Sellers Product By Product ID
+        app.delete("/delete-product/:id", async (req, res) => {
+            const id = req.params.id;
+            const query = { _id: ObjectId(id) };
+            const result = await productsCollection.deleteOne(query);
+            res.send(result);
+        })
+
         // Send Category Wise Product
         app.get("/category/:category_name", async (req, res) => {
             const category = req.params.category_name;
@@ -120,11 +128,13 @@ async function dataBase() {
             res.send(userOrders);
         })
 
+
+        // TODO
         // Send Specific Booking Product By ID
         app.get("/booking-payment/:id", async (req, res) => {
             const id = req.params.id;
             const query = { _id: ObjectId(id) };
-            const bookingProduct = await bookingsCollection.findOne(query);
+            const bookingProduct = await productsCollection.findOne(query);
             res.send(bookingProduct);
         })
 
@@ -159,7 +169,6 @@ async function dataBase() {
                 alreadySold.map(sold => sold._id !== product.productId)
             )
 
-            console.log(remainingProducts);
 
 
 
