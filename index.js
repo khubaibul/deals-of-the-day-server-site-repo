@@ -30,6 +30,7 @@ async function dataBase() {
         const usersCollection = client.db("deals-of-the-day").collection("users");
         const categoriesCollection = client.db("deals-of-the-day").collection("categories");
         const productsCollection = client.db("deals-of-the-day").collection("products");
+        const advertiseCollection = client.db("deals-of-the-day").collection("advertise");
         const bookingsCollection = client.db("deals-of-the-day").collection("bookings");
         const wishlistCollection = client.db("deals-of-the-day").collection("wishlist");
         const paymentsCollection = client.db("deals-of-the-day").collection("payments");
@@ -38,6 +39,7 @@ async function dataBase() {
         app.put("/user/:email", async (req, res) => {
             const email = req.params.email;
             const user = req.body;
+            // const userEmail = user.email;
             const filter = { email: email };
             const options = { upsert: true };
             const updatedDoc = {
@@ -68,6 +70,21 @@ async function dataBase() {
         })
 
 
+        // Update Seller Verification
+        app.put("/seller-verification", async (req, res) => {
+            const email = req.body.email;
+            const filter = { sellerEmail: email };
+            const options = { upsert: true };
+            const updatedDoc = {
+                $set: {
+                    verification: "Verified"
+                },
+            }
+
+            const result = await productsCollection.updateMany(filter, updatedDoc, options);
+            res.send(result)
+        })
+
         // Send Product Category
         app.get("/all-category", async (req, res) => {
             const query = {};
@@ -93,6 +110,34 @@ async function dataBase() {
             res.send(allProducts)
 
         })
+
+
+        // Add Advertisement Specific Product
+        app.post("/advertise-product", async (req, res) => {
+            const advertisedProduct = req.body;
+
+            const query = {};
+            const alreadyAdvertisedProducts = await advertiseCollection.find(query).toArray();
+
+            const isAlredyAdded = alreadyAdvertisedProducts.find(product => product._id === advertisedProduct._id);
+            if (!isAlredyAdded) {
+                const result = await advertiseCollection.insertOne(advertisedProduct)
+                res.send(result);
+            }
+            else {
+                res.send({ message: "Already Exist In Advertisement..." })
+            }
+        })
+
+
+        // Send Advertisement Product
+        app.get("/advertisement-products", async (req, res) => {
+            const query = {};
+            const allAdvertisedProduct = await advertiseCollection.find(query).toArray();
+            res.send(allAdvertisedProduct)
+        })
+
+
 
         // Delete Specific Sellers Product By Product ID
         app.delete("/delete-product/:id", async (req, res) => {
@@ -228,9 +273,10 @@ async function dataBase() {
         // Load Specific User By Email
         app.get("/user/admin/:email", async (req, res) => {
             const email = req.params.email;
+
             const query = { email: email };
             const user = await usersCollection.findOne(query);
-            if (user.buyerOrSeller === "Admin") {
+            if (user.isAdmin === "Admin") {
                 res.send({ isAdmin: "Admin" })
             }
             else {
