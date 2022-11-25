@@ -64,6 +64,15 @@ async function dataBase() {
         })
 
 
+        // Send Specific Sellers Product By Their Gmail
+        app.get("/myProducts", async (req, res) => {
+            const sellerEmail = req.query.email;
+            const query = { sellerEmail: sellerEmail };
+            const allProducts = await productsCollection.find(query).toArray();
+            res.send(allProducts)
+
+        })
+
         // Send Category Wise Product
         app.get("/category/:category_name", async (req, res) => {
             const category = req.params.category_name;
