@@ -47,6 +47,24 @@ async function dataBase() {
         })
 
 
+        // Send All Sellers To Admin 
+        app.get("/all-sellers", async (req, res) => {
+            const query = { buyerOrSeller: "Seller" }
+            const sellers = await usersCollection.find(query).toArray();
+            res.send(sellers);
+        })
+
+
+        // Send All Buyers To Admin
+        app.get("/all-buyers", async (req, res) => {
+            const query = {};
+            const allUsers = await usersCollection.find(query).toArray();
+            const notSellers = allUsers.filter(user => user.buyerOrSeller !== "Seller")
+            const buyers = notSellers.filter(user => user.buyerOrSeller !== "Admin")
+            res.send(buyers);
+        })
+
+
         // Send Product Category
         app.get("/all-category", async (req, res) => {
             const query = {};
