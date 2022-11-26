@@ -3,6 +3,7 @@ const cors = require('cors');
 require("colors");
 require("dotenv").config();
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
+const jwt = require("jsonwebtoken");
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const app = express();
 const port = process.env.PORT || 5000;
@@ -22,6 +23,26 @@ const client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology:
 app.get("/", (req, res) => {
     res.send("Deal Of The Day Server Is Running...")
 })
+
+
+
+function verifyJWT(req, res, next) {
+    // const token = req.headers.authorization;
+    // console.log(token);
+    const authHeader = req.headers.authorization
+    if (!authHeader) {
+        return res.status(401).send("UnAuthorized Access")
+    }
+    const token = authHeader.split(" ")[1];
+
+    jwt.verify(token, process.env.JWT_ACCESS_TOKEN, function (err, decoded) {
+        if (err) {
+            return res.status(403).send({ message: "Forbidden" })
+        }
+        req.decoded = decoded;
+        next();
+    })
+}
 
 
 // Database Connection Function
@@ -47,8 +68,11 @@ async function dataBase() {
             }
 
             const result = await usersCollection.updateOne(filter, updatedDoc, options);
+            const token = jwt.sign(user, process.env.JWT_ACCESS_TOKEN, {
+                expiresIn: "7d"
+            });
 
-            res.send({ result })
+            res.send({ result, token })
         })
 
 
@@ -61,7 +85,7 @@ async function dataBase() {
 
 
         // Send All Buyers To Admin
-        app.get("/all-buyers", async (req, res) => {
+        app.get("/all-buyers", verifyJWT, async (req, res) => {
             const query = {};
             const allUsers = await usersCollection.find(query).toArray();
             const notSellers = allUsers.filter(user => user.buyerOrSeller !== "Seller")
@@ -131,7 +155,7 @@ async function dataBase() {
 
 
         // Add Advertisement Specific Product
-        app.post("/advertise-product", async (req, res) => {
+        app.post("/advertise-product", verifyJWT, async (req, res) => {
             const advertisedProduct = req.body;
 
             const query = {};
@@ -184,15 +208,18 @@ async function dataBase() {
 
 
         // Send Booking Product By Their Specific Email
-        app.get("/myOrders", async (req, res) => {
+        app.get("/myOrders", verifyJWT, async (req, res) => {
             const email = req.query.email;
+            const decodedEmail = req.decoded.email;
+            if (email !== decodedEmail) {
+                return res.status(403).send({ message: "Forbidden" })
+            }
             const query = { buyerEmail: email }
             const userOrders = await bookingsCollection.find(query).toArray();
             res.send(userOrders);
         })
 
 
-        // TODO
         // Send Specific Booking Product By ID
         app.get("/booking-payment/:id", async (req, res) => {
             const id = req.params.id;
@@ -231,15 +258,6 @@ async function dataBase() {
             const remainingProducts = wishlistProducts.filter(product =>
                 alreadySold.map(sold => sold._id !== product.productId)
             )
-
-
-
-
-
-
-
-
-
 
             res.send(remainingProducts)
         })
@@ -315,7 +333,7 @@ async function dataBase() {
                 res.send({ isSeller: "Seller" })
             }
             else {
-                return res.send({ isAdmin: false })
+                return res.send({ isSeller: false })
             }
         })
 
