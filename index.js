@@ -274,6 +274,7 @@ async function dataBase() {
             const id = payment.bookingId;
             const query1 = { _id: ObjectId(id) };
             const query2 = { productId: id };
+            const deleteQuery = { _id: id };
             const updateDoc = {
                 $set: {
                     paid: true,
@@ -283,6 +284,7 @@ async function dataBase() {
 
             const updatePaymentStatusInBookingCollection = await bookingsCollection.updateOne(query2, updateDoc);
             const updatePaymentStatusInProductCollection = await productsCollection.updateOne(query1, updateDoc);
+            const deleteFromAdvertisementCollection = await advertiseCollection.deleteOne(deleteQuery)
             res.send(result);
         })
 
