@@ -83,6 +83,24 @@ async function dataBase() {
 
             const result = await productsCollection.updateMany(filter, updatedDoc, options);
             res.send(result)
+        });
+
+
+        // Delete Seller
+        app.delete("/seller-delete/:email", async (req, res) => {
+            const email = req.params.email;
+            const query = { email: email };
+            const result = await usersCollection.deleteOne(query);
+            res.send(result)
+        })
+
+
+        // Delete Buyer
+        app.delete("/buyer-delete/:email", async (req, res) => {
+            const email = req.params.email;
+            const query = { email: email };
+            const result = await usersCollection.deleteOne(query);
+            res.send(result)
         })
 
         // Send Product Category
@@ -255,16 +273,16 @@ async function dataBase() {
 
             const id = payment.bookingId;
             const query1 = { _id: ObjectId(id) };
-            const productId = payment.productId;
-            const query2 = { _id: ObjectId(productId) }
+            const query2 = { productId: id };
             const updateDoc = {
                 $set: {
                     paid: true,
                     transactionId: payment.transactionId
                 }
             }
-            const updatePaymentStatusInBookingCollection = await bookingsCollection.updateOne(query1, updateDoc);
-            const updatePaymentStatusInProductCollection = await productsCollection.updateOne(query2, updateDoc);
+
+            const updatePaymentStatusInBookingCollection = await bookingsCollection.updateOne(query2, updateDoc);
+            const updatePaymentStatusInProductCollection = await productsCollection.updateOne(query1, updateDoc);
             res.send(result);
         })
 
@@ -277,10 +295,25 @@ async function dataBase() {
             const query = { email: email };
             const user = await usersCollection.findOne(query);
             if (user.isAdmin === "Admin") {
-                res.send({ isAdmin: "Admin" })
+                return res.send({ isAdmin: "Admin" })
             }
             else {
                 res.send({ isAdmin: false })
+            }
+        })
+
+
+        // Load Specific User By Email
+        app.get("/user/seller/:email", async (req, res) => {
+            const email = req.params.email;
+
+            const query = { email: email };
+            const user = await usersCollection.findOne(query);
+            if (user.buyerOrSeller === "Seller") {
+                res.send({ isSeller: "Seller" })
+            }
+            else {
+                return res.send({ isAdmin: false })
             }
         })
 
