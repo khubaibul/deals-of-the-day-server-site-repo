@@ -1,6 +1,6 @@
 # Deals Of The Day
 
-## Live Server Link :
+## Live Server Link : https://deals-of-the-day-server.vercel.app
 
 ### Technologies
 
