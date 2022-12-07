@@ -143,6 +143,13 @@ async function dataBase() {
             res.send(result)
         })
 
+        // Sent All Products 
+        app.get("/all-products", async (req, res) => {
+            const query = {};
+            const result = await productsCollection.find(query).toArray();
+            res.send(result)
+        })
+
 
         // Send Specific Sellers Product By Their Gmail
         app.get("/myProducts", async (req, res) => {
