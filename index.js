@@ -9,7 +9,21 @@ const app = express();
 const port = process.env.PORT || 5000;
 
 // Middleware
-app.use(cors());
+// app.use(
+//     cors({
+//         origin: true,
+//         optionsSuccessStatus: 200,
+//         credentials: true,
+//     })
+// );
+
+const corsConfig = {
+    origin: '*',
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH']
+}
+app.use(cors(corsConfig))
+// app.use(cors(corsOptions))
 app.use(express.json());
 
 
@@ -68,9 +82,7 @@ async function dataBase() {
             }
 
             const result = await usersCollection.updateOne(filter, updatedDoc, options);
-            const token = jwt.sign(user, process.env.JWT_ACCESS_TOKEN, {
-                expiresIn: "7d"
-            });
+            const token = jwt.sign(user, process.env.JWT_ACCESS_TOKEN);
 
             res.send({ result, token })
         })
@@ -95,17 +107,16 @@ async function dataBase() {
 
 
         // Update Seller Verification
-        app.put("/seller-verification", async (req, res) => {
+        app.patch("/seller-verification", async (req, res) => {
             const email = req.body.email;
             const filter = { sellerEmail: email };
-            const options = { upsert: true };
             const updatedDoc = {
                 $set: {
                     verification: "Verified"
                 },
             }
 
-            const result = await productsCollection.updateMany(filter, updatedDoc, options);
+            const result = await usersCollection.update(filter, updatedDoc);
             res.send(result)
         });
 
@@ -149,15 +160,21 @@ async function dataBase() {
             const result = await productsCollection.find(query).toArray();
             res.send(result)
         })
+        // Send Single Product By Id 
+        app.get("/product/:_id", async (req, res) => {
+            const _id = req.params._id;
+            const filter = { _id: ObjectId(_id) };
+            const result = await productsCollection.findOne(filter);
+            res.send(result)
+        })
 
 
-        // Send Specific Sellers Product By Their Gmail
+        // Send Specific Seller Products By Gmail
         app.get("/myProducts", async (req, res) => {
             const sellerEmail = req.query.email;
-            const query = { sellerEmail: sellerEmail };
+            const query = { "sellerInformation.sellerEmail": sellerEmail };
             const allProducts = await productsCollection.find(query).toArray();
-            res.send(allProducts)
-
+            res.send(allProducts);
         })
 
 
@@ -207,10 +224,18 @@ async function dataBase() {
 
 
         // Store Booking Product
-        app.post("/store-booking-product", async (req, res) => {
-            const bookingProductDetails = req.body;
-            const result = await bookingsCollection.insertOne(bookingProductDetails);
-            res.send(result);
+        app.post("/add-to-cart", async (req, res) => {
+            const addToCartDetails = req.body;
+            const query = {};
+            const cartCollections = await bookingsCollection.find(query).toArray();
+            const alreadyAdded = cartCollections.find(product => (product.productId === addToCartDetails.productId) && product.buyerEmail === addToCartDetails.buyerEmail);
+            if (alreadyAdded) {
+                res.send({ message: "Already in your cart" })
+            }
+            else {
+                const result = await bookingsCollection.insertOne(addToCartDetails);
+                res.send(result);
+            }
         })
 
 
@@ -239,16 +264,21 @@ async function dataBase() {
         // Store Wishlist Product From Specific User
         app.post("/add-to-wishlist", async (req, res) => {
             const wishlistProduct = req.body;
+            const query = {};
+            const cartCollections = await bookingsCollection.find(query).toArray();
+            const alreadyAddedInCart = cartCollections.find(product => (product.productId === wishlistProduct.productId) && product.buyerEmail === wishlistProduct.buyerEmail);
+            if (alreadyAddedInCart) {
+                return res.send({ message: "Already in your wishlist" })
+            }
             const productId = wishlistProduct.productId;
             const buyerEmail = wishlistProduct.buyerEmail;
             const filter = { productId: productId, buyerEmail: buyerEmail }
             const alreadyAdded = await wishlistCollection.find(filter).toArray();
-
             if (alreadyAdded.length === 0) {
                 const result = await wishlistCollection.insertOne(wishlistProduct);
                 return res.send(result);
             }
-            res.send({ message: "Already Added" })
+            res.send({ message: "Already in your wishlist" });
 
         })
 
@@ -291,6 +321,8 @@ async function dataBase() {
         });
 
 
+
+        // ***********
         // Store Successful Payment Information
         app.post("/payment", async (req, res) => {
             const payment = req.body;
@@ -299,20 +331,34 @@ async function dataBase() {
             const id = payment.bookingId;
             const query1 = { _id: ObjectId(id) };
             const query2 = { productId: id };
-            const deleteQuery = { _id: id };
-            const updateDoc = {
+
+            const updateDoc1 = {
+                $inc: {
+                    sell: 1,
+                }
+            }
+
+            const updateDoc2 = {
                 $set: {
                     paid: true,
                     transactionId: payment.transactionId
                 }
             }
 
-            const updatePaymentStatusInBookingCollection = await bookingsCollection.updateOne(query2, updateDoc);
-            const updatePaymentStatusInProductCollection = await productsCollection.updateOne(query1, updateDoc);
-            const deleteFromAdvertisementCollection = await advertiseCollection.deleteOne(deleteQuery)
+            const updatePaymentStatusInProductCollection = await productsCollection.updateOne(query1, updateDoc1);
+            const updatePaymentStatusInBookingCollection = await bookingsCollection.updateOne(query2, updateDoc2);
+            const updatePaymentStatusInWishlistCollection = await wishlistCollection.updateOne(query2, updateDoc2);
             res.send(result);
         })
 
+
+        // Send Payment Information By Email
+        app.get("/order-summary/:email", async (req, res) => {
+            const email = req.params.email;
+            const query = { buyerEmail: email };
+            const result = await paymentsCollection.find(query).toArray();
+            res.send(result)
+        })
 
 
         // Load Specific User By Email
